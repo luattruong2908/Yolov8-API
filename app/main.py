@@ -16,7 +16,7 @@ async def predict_image(images: List[UploadFile] = UploadFile(...)):
         with open(file_path, "wb") as f:
             f.write(image.file.read())
 
-        predict(source=file_path, model_name="models/pretrained/yolov8n.pt", threshold=0.5)
+        predict(source=file_path, model_name="models/pretrained/yolov8n.pt", threshold=0.25)
         print(f"Image {id}/{len(images)}: Processed")
 
     return "SUCCESS"
