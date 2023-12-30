@@ -1,61 +1,56 @@
 import uvicorn
 import os
 from actions import predict_image_api, predict_video_api, allowed_file
-from fastapi import FastAPI, UploadFile, HTTPException
+from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks
 from typing import List
 
 app = FastAPI()
 
-@app.post("/actions/predictImage")
-async def predict_image(images: List[UploadFile] = UploadFile(...)):
-    os.makedirs("data/image/uploads", exist_ok=True)
+ml_status = False
 
-    for id, image in enumerate(images, start=1):
-        if not allowed_file(image.filename, type='image'):
+async def file_process(file_type, files):
+    os.makedirs(f"data/{file_type}/uploads", exist_ok=True)
+
+    for id, file in enumerate(files, start=1):
+
+        if not allowed_file(file.filename, type=file_type):
             raise HTTPException(status_code=400, detail="Wrong file type.")
-
-        file_path = os.path.join("data/image/uploads", image.filename)
-
+        
+        # Save file to specific location
+        file_path = os.path.join(f"data/{file_type}/uploads", file.filename)
         with open(file_path, "wb") as f:
-            f.write(image.file.read())
-
-        predict_image_api(source=file_path, model_name="models/pretrained/yolov8n.pt", threshold=0.25)
-        print(f"Image {id}/{len(images)}: Processed")
-
+            f.write(file.file.read())
+        
+        if file_type == "image":
+            predict_image_api(source=file_path, model_name="models/pretrained/yolov8n.pt", threshold=0.25)
+            print(f"Image {id}/{len(files)}: Processed")
+        elif file_type == "video":
+            predict_video_api(source=file_path, model_name="models/pretrained/yolov8n.pt", threshold=0.25)
+            print(f"Video {id}/{len(files)}: Processed")
+        
+        global ml_status
+        ml_status = False
+    
     return "SUCCESS"
 
-@app.post("/actions/predictVideo")
-async def predict_video(video: UploadFile = UploadFile(...)):
-    os.makedirs("data/video/uploads", exist_ok=True)
+@app.get("/")
+async def root():
+    return {"Hello": "World"}
 
-    if not allowed_file(video.filename, type='video'):
-            raise HTTPException(status_code=400, detail="Wrong file type.")
-    file_path = os.path.join("data/video/uploads", video.filename)
+@app.get("/setup")
+async def setup():
+    global ml_status
 
-    with open(file_path, "wb") as f:
-        f.write(video.file.read())
+    return ml_status
 
-    predict_video_api(source=file_path, model_name="models/pretrained/yolov8n.pt", threshold=0.25) 
-
-    return "SUCCESS"
-
-@app.post("/actions/predictImage")
-async def predict_image(images: List[UploadFile] = UploadFile(...)):
-    os.makedirs("data/image/uploads", exist_ok=True)
-
-    for id, image in enumerate(images, start=1):
-        if not allowed_file(image.filename, type='image'):
-            raise HTTPException(status_code=400, detail="Wrong file type.")
-
-        file_path = os.path.join("data/image/uploads", image.filename)
-
-        with open(file_path, "wb") as f:
-            f.write(image.file.read())
-
-        predict_image_api(source=file_path, model_name="models/pretrained/yolov8n.pt", threshold=0.25)
-        print(f"Image {id}/{len(images)}: Processed")
+@app.post("/actions/predict/{file_type}")
+async def predict(file_type: str, files: List[UploadFile]):
+    global ml_status
+    ml_status = True
+    
+    await file_process(file_type, files)
 
     return "SUCCESS"
-
+        
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="localhost", port=5000, reload=True)
+     uvicorn.run("main:app", host="localhost", port=8000, workers=6)
