@@ -30,27 +30,30 @@ async def file_process(file_type, files):
         
         global ml_status
         ml_status = False
-    
-    return "SUCCESS"
+
+        print("DONE PROCESSING!!!")
 
 @app.get("/")
 async def root():
     return {"Hello": "World"}
 
 @app.get("/setup")
-async def setup():
+def setup():
     global ml_status
 
     return ml_status
 
 @app.post("/actions/predict/{file_type}")
-async def predict(file_type: str, files: List[UploadFile]):
+async def predict(file_type: str, files: List[UploadFile], background_tasks: BackgroundTasks):
     global ml_status
     ml_status = True
-    
-    await file_process(file_type, files)
 
-    return "SUCCESS"
+    async def run_file_process():
+        await file_process(file_type, files)
+    
+    background_tasks.add_task(run_file_process)
+
+    return "PROCESSING..."
         
 if __name__ == "__main__":
-     uvicorn.run("main:app", host="localhost", port=8000, workers=6)
+     uvicorn.run("main:app", host="localhost", port=8000, reload=True)
