@@ -35,7 +35,6 @@ def file_process(file_type, files):
         elif file_type == "video":
             predict_video_api(source=file_path, model_name="models/pretrained/yolov8n.pt", threshold=0.25)
             print(f"Video {id}/{len(files)}: Processed")
-        print(is_running)
         
     is_running -= 1
     if is_running == 0:
