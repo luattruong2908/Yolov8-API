@@ -6,16 +6,14 @@ from typing import List
 
 app = FastAPI()
 
-ml_status = False
-is_running = 0
+ml_status = {"status": False, "is_running": 0}
 
 def file_process(file_type, files):
     os.makedirs(f"data/{file_type}/uploads", exist_ok=True)
 
     global ml_status
-    global is_running
-    ml_status = True
-    is_running += 1
+    ml_status["status"] = True
+    ml_status["is_running"] += 1
 
     for id, file in enumerate(files, start=1):
         if not allowed_file(file.filename, type=file_type):
@@ -35,10 +33,10 @@ def file_process(file_type, files):
         elif file_type == "video":
             predict_video_api(source=file_path, model_name="models/pretrained/yolov8n.pt", threshold=0.25)
             print(f"Video {id}/{len(files)}: Processed")
-        
-    is_running -= 1
-    if is_running == 0:
-        ml_status = False
+
+    ml_status["is_running"] -= 1    
+    if ml_status["is_running"] == 0:
+        ml_status["status"] = False
 
     print("DONE PROCESSING!!!")
     return None
@@ -50,14 +48,14 @@ def root():
 @app.get("/setup")
 def setup():
     global ml_status
-
-    return ml_status
+    return ml_status["status"]
 
 @app.post("/actions/predict/{file_type}")
-def predict(file_type: str, files: List[UploadFile]):
-    file_process(file_type, files)
+async def predict(file_type: str, files: List[UploadFile], background_tasks: BackgroundTasks):
+    background_tasks.add_task(file_process, file_type, files)
 
     return "PROCESSING..."
 
+        
 if __name__ == "__main__":
      uvicorn.run("main:app", host="localhost", port=8000, reload=True)
